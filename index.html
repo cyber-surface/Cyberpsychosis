@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CipherLab — Vault Mechanics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- CryptoJS Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+<style>
+  :root{
+    --bg:      #050f1a;
+    --bg-deep: #020a12;
+    --line:    #EAF6FB;
+    --cyan:    #4FD6E8;
+    --amber:   #E2793D;
+    --steel:   #7C93A6;
+    --panel:   #0b1e2e;
+    --panel-2: #071525;
+    --green:   #6FD69B;
+    --glow:    rgba(79, 214, 232, 0.25);
+    --purple:  #9b59f5;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    background-color: var(--bg);
+    background-image: 
+      linear-gradient(rgba(79,214,232,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,214,232,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-attachment: fixed;
+    animation: gridPulse 8s ease-in-out infinite;
+    color: var(--line);
+    font-family: 'Work Sans', sans-serif;
+    line-height: 1.55;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  @keyframes gridPulse {
+    0%, 100% { background-size: 40px 40px; opacity: 1; }
+    50% { background-size: 42px 42px; }
+  }
+
+  .wrap{ max-width: 920px; margin: 0 auto; padding: 44px 22px 100px; position: relative; z-index: 10; }
+
+  /* --- BRAND & LOGO --- */
+  header.top{ display:flex; justify-content:space-between; align-items:flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 8px; animation: headerSlideIn 0.9s ease both; }
+  @keyframes headerSlideIn { from { opacity:0; transform:translateY(-20px); } to { opacity:1; transform:translateY(0); } }
+
+  .brand h1{ font-family:'Space Mono', monospace; font-weight:700; font-size: 2.1rem; letter-spacing: 3px; margin: 0; text-transform: uppercase; }
+  .brand h1 span{ color: var(--cyan); transition: 0.3s; display: inline-block; animation: shimmer 4s ease-in-out infinite; }
+  @keyframes shimmer { 0%,100% { text-shadow:0 0 8px var(--glow); } 50% { text-shadow:0 0 25px var(--cyan); } }
+  .brand h1:hover span { text-shadow: 2px 0 var(--amber), -2px 0 var(--green); animation: glitch 0.3s infinite; }
+  @keyframes glitch { 0% { transform: translate(0); } 25% { transform: translate(-2px, 1px); } 50% { transform: translate(2px, -1px); } 100% { transform: translate(0); } }
+
+  .badge{ font-family:'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 1.5px; color: var(--cyan); border: 1px solid var(--cyan); padding: 6px 12px; text-transform: uppercase; }
+  .tagline{ font-family:'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--steel); border-left: 2px solid var(--cyan); padding-left: 14px; margin: 22px 0 36px; }
+
+  /* --- TABS --- */
+  .tabs{ display:flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
+  .tab-btn{ font-family:'Space Mono', monospace; font-size: 0.75rem; letter-spacing: 1.5px; text-transform: uppercase; background: transparent; color: var(--steel); border: 1px solid var(--steel); padding: 10px 18px; cursor: pointer; transition: 0.3s; }
+  .tab-btn.active{ color: var(--bg-deep); background: var(--cyan); border-color: var(--cyan); font-weight:700; box-shadow: 0 0 15px var(--glow); }
+  .tab-btn:hover:not(.active) { color: var(--cyan); border-color: var(--cyan); transform: translateY(-2px); }
+
+  .sub-tabs { display: flex; gap: 1px; background: rgba(234,246,251,0.1); margin: -34px -34px 30px -34px; }
+  .sub-tab-btn { flex: 1; padding: 12px; border: none; background: rgba(10, 24, 38, 0.4); color: var(--steel); font-family: 'Space Mono', monospace; font-size: 0.65rem; text-transform: uppercase; cursor: pointer; transition: 0.2s; }
+  .sub-tab-btn.active { background: var(--panel-2); color: var(--cyan); border-bottom: 2px solid var(--cyan); }
+
+  /* --- PANELS --- */
+  .panel{ display:none; position: relative; background: var(--panel); border: 1px solid rgba(79,214,232,0.15); padding: 34px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+  .panel.active{ display:block; animation: panelReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @keyframes panelReveal { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+  .panel.scanning::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); z-index: 100; animation: scan 1.5s linear infinite; }
+  @keyframes scan { 0% { top: 0%; opacity: 0; } 50% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+
+  .crop-bl, .crop-br{ content:""; position:absolute; width: 16px; height:16px; border-color: var(--cyan); border-style: solid; }
+  .crop-bl{ bottom:-1px; left:-1px; border-width: 0 0 2px 2px; }
+  .crop-br{ bottom:-1px; right:-1px; border-width: 0 2px 2px 0; }
+
+  textarea, input[type="text"], input[type="password"]{ width:100%; font-family:'JetBrains Mono', monospace; font-size: 0.9rem; background: var(--bg-deep); color: var(--line); border: 1px solid var(--steel); padding: 12px 14px; transition: 0.3s; }
+  textarea:focus, input:focus{ outline: 2px solid var(--cyan); border-color: var(--cyan); box-shadow: 0 0 15px rgba(79,214,232,0.1); }
+
+  label.field-label{ display:block; font-family:'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 2px; text-transform: uppercase; color: var(--steel); margin: 18px 0 8px; }
+
+  button.action{ font-family:'Space Mono', monospace; letter-spacing: 1.5px; text-transform: uppercase; font-size: 0.78rem; background: var(--cyan); color: var(--bg-deep); border: none; font-weight: 700; padding: 13px 24px; cursor: pointer; margin-top: 18px; transition: 0.3s; }
+  button.action:hover:not(:disabled){ box-shadow: 0 0 20px var(--cyan); transform: translateY(-2px); }
+  button.action.ghost { background: transparent; border: 1px solid var(--cyan); color: var(--cyan); }
+
+  .lock-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-top: 8px; }
+  .lock-card{ border: 1px solid var(--steel); padding: 12px 8px; text-align:center; cursor:pointer; transition: 0.15s; background: var(--bg-deep); }
+  .lock-card.selected{ border-color: var(--cyan); box-shadow: 0 0 10px var(--glow); background: rgba(79,214,232,0.05); }
+  .lock-card .lname{ font-family:'Space Mono', monospace; font-size: 0.65rem; text-transform: uppercase; margin-top:5px; }
+
+  .report{ display:none; margin-top: 30px; border-top: 1px dashed rgba(234,246,251,0.3); padding-top: 26px; }
+  .report.show{ display:block; animation: fadeIn 0.3s; }
+  .verdict-tag{ font-family:'Space Mono', monospace; font-size: 1rem; font-weight: 700; padding: 8px 16px; display:inline-block; border: 2px solid currentColor; margin-bottom: 14px; }
+  .verdict-tag.green{ color: var(--green); }
+  .verdict-tag.amber{ color: var(--amber); }
+  .verdict-tag.cyan{ color: var(--cyan); }
+  
+  .codeblock{ font-family:'JetBrains Mono', monospace; font-size: 0.78rem; background: #020a12; border: 1px solid rgba(79,214,232,0.12); padding: 14px; margin-top: 10px; white-space: pre-wrap; word-break: break-all; color: var(--steel); }
+  .sys-log { margin-top: 15px; font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--steel); max-height: 80px; overflow-y: auto; border-left: 2px solid var(--cyan); padding-left: 10px; background: rgba(0,0,0,0.2); }
+
+  /* --- LOCK ANIMATION OVERLAY --- */
+  #lock-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(5, 15, 26, 0.95); z-index: 1000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+  .mech-stage { position: relative; width: 200px; height: 200px; filter: drop-shadow(0 0 20px var(--cyan)); }
+  .mech-lock { width: 100px; height: 120px; fill: none; stroke: var(--cyan); stroke-width: 4; }
+  .shackle { transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+  .locking .shackle { transform: translateY(20px); }
+  .unlocking .shackle { transform: translateY(0); }
+  .mech-key { position: absolute; top: 50%; left: 160%; transform: translate(-50%, -50%); width: 60px; height: 30px; fill: none; stroke: var(--amber); stroke-width: 3; opacity: 0; }
+  @keyframes keyInsert { 0% { left: 160%; opacity: 0; transform: translate(-50%, -50%) rotate(0deg); } 30% { left: 50%; opacity: 1; transform: translate(-50%, -50%) rotate(0deg); } 60% { left: 50%; opacity: 1; transform: translate(-50%, -50%) rotate(90deg); } 85% { left: 50%; opacity: 1; transform: translate(-50%, -50%) rotate(90deg); } 100% { left: 160%; opacity: 0; transform: translate(-50%, -50%) rotate(0deg); } }
+  .animating .mech-key { animation: keyInsert 1.8s forwards ease-in-out; }
+  .mech-text { position: absolute; bottom: -40px; left: 50%; transform: translateX(-50%); font-family: 'Space Mono'; color: var(--cyan); font-size: 0.7rem; white-space: nowrap; }
+
+  /* --- MATRIX BACKGROUND --- */
+  #matrix-canvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; opacity: 0.08; pointer-events: none; }
+
+  footer{ margin-top: 46px; font-family:'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--steel); text-align:center; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+<canvas id="matrix-canvas"></canvas>
+
+<div id="lock-overlay">
+  <div class="mech-stage" id="mechStage">
+    <svg class="mech-lock" viewBox="0 0 100 120">
+      <path class="shackle" d="M25 45V30C25 16 36 5 50 5C64 5 75 16 75 30V45"></path>
+      <rect x="10" y="45" width="80" height="70" rx="5"></rect>
+      <circle cx="50" cy="80" r="8"></circle>
+      <path d="M50 88V100"></path>
+    </svg>
+    <svg class="mech-key" viewBox="0 0 60 30">
+      <circle cx="15" cy="15" r="12"></circle>
+      <path d="M27 15H60M55 15V22M48 15V22"></path>
+    </svg>
+    <div class="mech-text" id="mechText">SECURE PROTOCOL ACTIVE</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Cipher<span>Lab</span></h1>
+      <div style="font-family:'JetBrains Mono'; font-size: 0.7rem; color: var(--steel); text-transform: uppercase; margin-top: 4px; letter-spacing: 3px;">Vault Mechanics · Applied Crypto</div>
+    </div>
+    <div class="badge">Hybrid Encryption Engine</div>
+  </header>
+
+  <div class="tagline">
+    <b>Secure Data Orchestration.</b> Encapsulate local files via Symmetric AES or Asymmetric RSA-OAEP logic.
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="detect">01 · Detector</button>
+    <button class="tab-btn" data-tab="vault">02 · File Vault</button>
+    <button class="tab-btn" data-tab="share">03 · One-Time Share</button>
+  </div>
+
+  <!-- PANEL 01: DETECTOR -->
+  <div class="panel active" id="panel-detect">
+    <div class="crop-bl"></div><div class="crop-br"></div>
+    <h2 style="font-family:'Space Mono'; margin:0 0 10px;">Universal Diagnostic</h2>
+    <textarea id="detectInput" placeholder="Paste data (Hash, Base64, or Hex) for structure analysis..."></textarea>
+    <button class="action" id="detectBtn">Analyze Signature</button>
+
+    <div class="report" id="detectReport">
+      <div class="verdict-tag" id="detectTag">—</div>
+      <div id="detectText" style="font-size:0.95rem;"></div>
+      <div class="codeblock" id="detectProof" style="display:none;"></div>
+      <div class="sys-log" id="detectLog"></div>
+    </div>
+  </div>
+
+  <!-- PANEL 02: VAULT -->
+  <div class="panel" id="panel-vault">
+    <div class="sub-tabs">
+        <button class="sub-tab-btn active" data-sub="personal">Personal sharing (Symmetric)</button>
+        <button class="sub-tab-btn" data-sub="public">Public sharing (Asymmetric)</button>
+    </div>
+    <div class="crop-bl"></div><div class="crop-br"></div>
+
+    <div id="dropzone" style="border: 2px dashed var(--steel); padding: 30px; text-align:center; cursor:pointer;">
+      <div style="font-weight:600;">Drop target file or click to select</div>
+      <input type="file" id="fileInput" style="display:none;">
+    </div>
+    <div id="fileChip" style="margin-top:10px; color:var(--cyan); font-family:monospace; font-size:0.8rem; display:none;"></div>
+
+    <!-- PERSONAL (SYMMETRIC) -->
+    <div id="vault-personal" class="vault-sub-panel">
+        <div id="lockPickerSymmetric" style="display:none; margin-top:20px;">
+            <label class="field-label">Algorithm selection</label>
+            <div class="lock-grid" id="lockGrid"></div>
+            <label class="field-label">Security Passphrase</label>
+            <input type="password" id="vaultPassword" placeholder="Set a key for this file">
+            <button class="action" id="vaultEncryptBtn">Lock & Download</button>
+        </div>
+        <div id="decryptSymmetric" style="display:none; margin-top:20px;">
+            <div style="margin-bottom:10px; font-size:0.9rem;">Mechanism: <b id="decryptMethodLabel">...</b></div>
+            <label class="field-label">Passphrase</label>
+            <input type="password" id="decryptPassword">
+            <button class="action" id="vaultDecryptBtn">Unlock & Download</button>
+        </div>
+    </div>
+
+    <!-- PUBLIC (ASYMMETRIC) -->
+    <div id="vault-public" class="vault-sub-panel" style="display:none;">
+        <div id="keyTools" style="margin-top:20px; border-bottom: 1px solid var(--panel-2); padding-bottom: 20px;">
+            <button class="action ghost" id="genKeyPair">Generate RSA Keypair</button>
+            <div id="keyDisplay" style="display:none; margin-top:10px; font-size:0.7rem; color:var(--green);">Keys derived and exported.</div>
+        </div>
+        <div id="asymmActions" style="margin-top:20px;">
+            <div id="asymmEncryptBlock">
+                <label class="field-label">Recipient's Public Key (JWK)</label>
+                <textarea id="pubKeyInput" placeholder="Paste the receiver's public key..."></textarea>
+                <button class="action" id="asymmEncryptBtn">Asymmetric Lock</button>
+            </div>
+            <div id="asymmDecryptBlock" style="display:none;">
+                <label class="field-label">Your Private Key (JWK)</label>
+                <textarea id="privKeyInput" placeholder="Paste your private key..."></textarea>
+                <button class="action" id="asymmDecryptBtn">Asymmetric Unlock</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="sys-log" id="vaultLog"></div>
+  </div>
+
+  <!-- PANEL 03: SHARE -->
+  <div class="panel" id="panel-share">
+    <div class="crop-bl"></div><div class="crop-br"></div>
+    <div id="shareNormal">
+      <h2 style="font-family:'Space Mono';">One-Time Secret</h2>
+      <textarea id="shareSecret" placeholder="Enter sensitive message..."></textarea>
+      <div id="lengthCounter" style="font-family:'JetBrains Mono'; font-size:0.72rem; color:var(--steel); margin-top:6px;"></div>
+
+      <label class="field-label">Passphrase</label>
+      <input type="password" id="sharePassword" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="write your own, or generate one below">
+      <div style="display:flex; align-items:center; gap:14px; margin-top:8px;">
+        <span class="toggle-link" id="sharePwToggle" style="margin-top:0; cursor:pointer; text-decoration:underline; color:var(--steel); font-family:'JetBrains Mono'; font-size:0.75rem;">show</span>
+        <span class="toggle-link" id="genPassphraseBtn" style="margin-top:0; cursor:pointer; text-decoration:underline; color:var(--cyan); font-family:'JetBrains Mono'; font-size:0.75rem;">generate a strong passphrase</span>
+      </div>
+
+      <label class="field-label">Expires</label>
+      <select id="shareExpiry" style="width:100%; font-family:'JetBrains Mono', monospace; font-size:0.9rem; background:var(--bg-deep); color:var(--line); border:1px solid var(--steel); padding:12px 14px;">
+        <option value="3600000">1 hour</option>
+        <option value="86400000" selected>24 hours</option>
+        <option value="604800000">7 days</option>
+        <option value="0">Never (only destroyed when opened)</option>
+      </select>
+
+      <button class="action" id="shareGenBtn">Generate Secure Link</button>
+      <div class="report" id="shareGenReport">
+        <div class="codeblock" id="shareLinkOut"></div>
+        <button class="action ghost" id="shareCopyBtn">Copy Link</button>
+      </div>
+    </div>
+
+    <div id="shareReveal" style="display:none;">
+      <h2 style="font-family:'Space Mono';">Decapsulation</h2>
+      <div id="revealPasswordBlock">
+        <input type="password" id="revealPassword" placeholder="Passphrase" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <span class="toggle-link" id="revealPwToggle" style="cursor:pointer; text-decoration:underline; color:var(--steel); font-family:'JetBrains Mono'; font-size:0.75rem; display:inline-block; margin-top:8px;">show</span>
+        <button class="action" id="revealBtn">Authorize Access</button>
+        <div id="attemptsNote" style="color:var(--steel); font-family:'JetBrains Mono'; font-size:0.75rem; margin-top:8px;"></div>
+        <div id="revealError" style="color:var(--amber); font-family:'JetBrains Mono'; font-size:0.8rem; margin-top:10px;"></div>
+      </div>
+      <div class="report" id="revealReport">
+        <div class="codeblock" id="revealText"></div>
+        <div style="color:var(--steel); font-family:'JetBrains Mono'; font-size:0.75rem; margin-top:10px;">This message is already marked as read. Closing or reloading this page will not bring it back — for anyone, on this browser.</div>
+      </div>
+      <div class="report" id="alreadyViewedReport">
+        <div class="verdict-tag amber">Already Viewed</div>
+        <div style="font-size:0.9rem;">This message was already opened and destroyed in this browser.</div>
+      </div>
+      <div class="report" id="expiredReport">
+        <div class="verdict-tag amber">Expired</div>
+        <div style="font-size:0.9rem;">This link's expiration window has passed. It was never opened, but it's no longer usable — ask for a new one.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    SYSTEM: OPERATIONAL · RSA-2048 + AES-GCM · PBKDF2: 150k ITERATIONS
+  </footer>
+</div>
+
+<script>
+/* --- CORE UTILS --- */
+const strToBytes = s => new TextEncoder().encode(s);
+const bytesToStr = b => new TextDecoder().decode(b);
+const bufToB64 = b => btoa(String.fromCharCode(...new Uint8Array(b)));
+const b64ToBuf = s => Uint8Array.from(atob(s), c => c.charCodeAt(0)).buffer;
+const toB64Url = s => s.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const fromB64Url = s => { let b = s.replace(/-/g,'+').replace(/_/g,'/'); while(b.length % 4) b += '='; return b; };
+
+function logSys(id, msg) {
+  const el = document.getElementById(id);
+  const time = new Date().toLocaleTimeString([], {hour12:false});
+  el.innerHTML = `<div><b>[${time}]</b> ${msg}</div>` + el.innerHTML;
+}
+
+function download(data, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], {type: 'application/json'}));
+  a.download = name; a.click();
+}
+
+/* --- ANIMATION LOGIC --- */
+async function runLockAnimation(isLocking) {
+  const overlay = document.getElementById('lock-overlay');
+  const stage = document.getElementById('mechStage');
+  overlay.style.display = 'flex';
+  stage.classList.remove('locking', 'unlocking', 'animating');
+  void stage.offsetWidth;
+  stage.classList.add(isLocking ? 'unlocking' : 'locking');
+  stage.classList.add('animating');
+  setTimeout(() => {
+    stage.classList.remove('locking', 'unlocking');
+    stage.classList.add(isLocking ? 'locking' : 'unlocking');
+  }, 900);
+  await new Promise(r => setTimeout(r, 2000));
+  overlay.style.display = 'none';
+}
+
+/* --- MATRIX RAIN --- */
+const canvas = document.getElementById('matrix-canvas');
+const ctx = canvas.getContext('2d');
+let w, h, columns;
+const fontSize = 16;
+const chars = "01010101XYZABC<>{}[]";
+let drops = [];
+
+function initMatrix() {
+  w = canvas.width = window.innerWidth;
+  h = canvas.height = window.innerHeight;
+  columns = Math.floor(w / fontSize);
+  drops = Array(columns).fill(1);
+}
+function drawMatrix() {
+  ctx.fillStyle = "rgba(5, 15, 26, 0.05)";
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = "#4FD6E8";
+  ctx.font = fontSize + "px monospace";
+  for (let i = 0; i < drops.length; i++) {
+    const text = chars[Math.floor(Math.random() * chars.length)];
+    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+    if (drops[i] * fontSize > h && Math.random() > 0.975) drops[i] = 0;
+    drops[i]++;
+  }
+}
+window.addEventListener('resize', initMatrix);
+initMatrix();
+setInterval(drawMatrix, 50);
+
+/* --- TAB NAVIGATION --- */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.tab-btn, .panel').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  };
+});
+
+document.querySelectorAll('.sub-tab-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.vault-sub-panel').forEach(p => p.style.display = 'none');
+    btn.classList.add('active');
+    document.getElementById('vault-' + btn.dataset.sub).style.display = 'block';
+  };
+});
+
+/* --- DETECTOR: real encoding detection + real hash cracking --- */
+const ENGLISH_FREQ = {A:8.17,B:1.29,C:2.78,D:4.25,E:12.70,F:2.23,G:2.02,H:6.09,I:6.97,J:0.15,K:0.77,L:4.03,M:2.41,N:6.75,O:7.51,P:1.93,Q:0.10,R:5.99,S:6.33,T:9.06,U:2.76,V:0.98,W:2.36,X:0.15,Y:1.97,Z:0.07};
+
+const COMMON_PASSWORDS = ["123456","password","123456789","12345678","12345","qwerty","1234567","111111","1234567890","123123","abc123","1q2w3e4r","password1","iloveyou","000000","qwerty123","admin","welcome","monkey","dragon","letmein","football","login","princess","solo","master","sunshine","passw0rd","trustno1","starwars","freedom","whatever","hello","charlie","donald","shadow","superman","666666","1234","qazwsx","michael","baseball","jennifer","hunter","access","yankees","summer","2000","tigger","ashley","harley"];
+
+function isMostlyPrintable(bytes){
+  let printable = 0;
+  for(const b of bytes){ if((b>=32 && b<=126) || b===9 || b===10 || b===13) printable++; }
+  return bytes.length>0 && (printable/bytes.length) > 0.85;
+}
+function tryBase64(text){
+  const clean = text.trim();
+  if(!/^[A-Za-z0-9+/]+={0,2}$/.test(clean) || clean.length % 4 !== 0 || clean.length < 8) return null;
+  try{
+    const bin = atob(clean);
+    const bytes = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+    return { bytes, printable: isMostlyPrintable(bytes) };
+  }catch(e){ return null; }
+}
+function tryHex(text){
+  const clean = text.trim().replace(/\s+/g,'');
+  if(!/^[0-9a-fA-F]+$/.test(clean) || clean.length % 2 !== 0 || clean.length < 8) return null;
+  const bytes = new Uint8Array(clean.length/2);
+  for(let i=0;i<bytes.length;i++) bytes[i] = parseInt(clean.substr(i*2,2),16);
+  return { bytes, printable: isMostlyPrintable(bytes) };
+}
+function caesarChiSquare(text, shift){
+  const letters = text.toUpperCase().replace(/[^A-Z]/g,'');
+  if(letters.length < 12) return { chi: Infinity, decoded: '' };
+  const counts = {};
+  for(const ch of letters){
+    const dec = String.fromCharCode(((ch.charCodeAt(0)-65-shift)%26+26)%26 + 65);
+    counts[dec] = (counts[dec]||0)+1;
+  }
+  let chi = 0; const n = letters.length;
+  for(const L in ENGLISH_FREQ){
+    const observed = counts[L]||0, expected = n*(ENGLISH_FREQ[L]/100);
+    chi += Math.pow(observed-expected,2)/expected;
+  }
+  let out=''; 
+  for(const ch of text){
+    if(/[A-Za-z]/.test(ch)){
+      const isUpper = ch===ch.toUpperCase();
+      const code = ((ch.toUpperCase().charCodeAt(0)-65-shift)%26+26)%26;
+      const dch = String.fromCharCode(code+65);
+      out += isUpper? dch : dch.toLowerCase();
+    } else out += ch;
+  }
+  return { chi: chi/n, decoded: out };
+}
+function tryCaesar(text){
+  const letterCount = (text.match(/[A-Za-z]/g)||[]).length;
+  if(letterCount < 15 || letterCount/text.length < 0.5) return null;
+  let best = { chi: Infinity, shift: 0, decoded:'' };
+  for(let s=1;s<26;s++){
+    const r = caesarChiSquare(text, s);
+    if(r.chi < best.chi) best = { chi:r.chi, shift:s, decoded:r.decoded };
+  }
+  return best.chi < 2.2 ? best : null;
+}
+function shannonEntropy(text){
+  const counts = {};
+  for(const ch of text) counts[ch]=(counts[ch]||0)+1;
+  let entropy = 0; const n = text.length;
+  for(const k in counts){ const p=counts[k]/n; entropy -= p*Math.log2(p); }
+  return entropy;
+}
+
+// Minimal standalone MD5 (RFC 1321) — kept local so hash cracking works fully offline
+function md5(str){
+  function rotl(x,c){ return (x<<c)|(x>>>(32-c)); }
+  const K = new Uint32Array([0xd76aa478,0xe8c7b756,0x242070db,0xc1bdceee,0xf57c0faf,0x4787c62a,0xa8304613,0xfd469501,0x698098d8,0x8b44f7af,0xffff5bb1,0x895cd7be,0x6b901122,0xfd987193,0xa679438e,0x49b40821,0xf61e2562,0xc040b340,0x265e5a51,0xe9b6c7aa,0xd62f105d,0x02441453,0xd8a1e681,0xe7d3fbc8,0x21e1cde6,0xc33707d6,0xf4d50d87,0x455a14ed,0xa9e3e905,0xfcefa3f8,0x676f02d9,0x8d2a4c8a,0xfffa3942,0x8771f681,0x6d9d6122,0xfde5380c,0xa4beea44,0x4bdecfa9,0xf6bb4b60,0xbebfbc70,0x289b7ec6,0xeaa127fa,0xd4ef3085,0x04881d05,0xd9d4d039,0xe6db99e5,0x1fa27cf8,0xc4ac5665,0xf4292244,0x432aff97,0xab9423a7,0xfc93a039,0x655b59c3,0x8f0ccc92,0xffeff47d,0x85845dd1,0x6fa87e4f,0xfe2ce6e0,0xa3014314,0x4e0811a1,0xf7537e82,0xbd3af235,0x2ad7d2bb,0xeb86d391]);
+  const S = [7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21];
+  let a0=0x67452301,b0=0xefcdab89,c0=0x98badcfe,d0=0x10325476;
+  const msgBytes = new TextEncoder().encode(str);
+  const bitLen = msgBytes.length*8;
+  const withOne = new Uint8Array(((msgBytes.length+8)>>6<<6)+64);
+  withOne.set(msgBytes); withOne[msgBytes.length]=0x80;
+  const dv = new DataView(withOne.buffer);
+  dv.setUint32(withOne.length-8, bitLen>>>0, true);
+  dv.setUint32(withOne.length-4, Math.floor(bitLen/0x100000000), true);
+  for(let chunkStart=0; chunkStart<withOne.length; chunkStart+=64){
+    const M = new Uint32Array(16);
+    for(let i=0;i<16;i++) M[i]=dv.getUint32(chunkStart+i*4, true);
+    let A=a0,B=b0,C=c0,D=d0;
+    for(let i=0;i<64;i++){
+      let F,g;
+      if(i<16){ F=(B&C)|(~B&D); g=i; }
+      else if(i<32){ F=(D&B)|(~D&C); g=(5*i+1)%16; }
+      else if(i<48){ F=B^C^D; g=(3*i+5)%16; }
+      else{ F=C^(B|~D); g=(7*i)%16; }
+      F=(F+A+K[i]+M[g])>>>0;
+      A=D; D=C; C=B; B=(B+rotl(F,S[i]))>>>0;
+    }
+    a0=(a0+A)>>>0; b0=(b0+B)>>>0; c0=(c0+C)>>>0; d0=(d0+D)>>>0;
+  }
+  return [a0,b0,c0,d0].map(n=>{
+    let s='';
+    for(let j=0;j<4;j++) s+=((n>>>(j*8))&0xff).toString(16).padStart(2,'0');
+    return s;
+  }).join('');
+}
+async function sha1Hex(str){
+  const digest = await crypto.subtle.digest('SHA-1', strToBytes(str));
+  return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function sha256HexPlain(str){
+  const digest = await crypto.subtle.digest('SHA-256', strToBytes(str));
+  return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function tryCrackHash(hashHex){
+  const clean = hashHex.trim().toLowerCase();
+  let hashFn, label;
+  if(clean.length === 32){ hashFn = async s=>md5(s); label='MD5'; }
+  else if(clean.length === 40){ hashFn = sha1Hex; label='SHA-1'; }
+  else if(clean.length === 64){ hashFn = sha256HexPlain; label='SHA-256'; }
+  else return null;
+  for(const candidate of COMMON_PASSWORDS){
+    const h = (await hashFn(candidate)).toLowerCase();
+    if(h === clean) return { label, candidate, triedCount: COMMON_PASSWORDS.length };
+  }
+  return { label, candidate: null, triedCount: COMMON_PASSWORDS.length };
+}
+
+document.getElementById('detectBtn').onclick = async () => {
+  const input = document.getElementById('detectInput').value.trim();
+  const tag = document.getElementById('detectTag');
+  const text = document.getElementById('detectText');
+  const proof = document.getElementById('detectProof');
+  proof.style.display = 'none';
+  if(!input) return;
+
+  document.getElementById('panel-detect').classList.add('scanning');
+  logSys('detectLog', 'Calibrating structural scanners...');
+
+  const isPureHex = /^[0-9a-fA-F]+$/.test(input.replace(/\s+/g,''));
+  const hexLen = input.replace(/\s+/g,'').length;
+
+  setTimeout(async () => {
+    document.getElementById('panel-detect').classList.remove('scanning');
+
+    if(isPureHex && [32,40,64].includes(hexLen)){
+      logSys('detectLog', 'Hex length matches a known hash width — attempting dictionary crack...');
+      const result = await tryCrackHash(input);
+      if(result.candidate){
+        tag.className = 'verdict-tag amber'; tag.textContent = `Cracked — ${result.label}`;
+        text.innerHTML = `This is a <b>${result.label}</b> hash, and it matches a common password: <b>"${result.candidate}"</b>. Hashing hides the original text, but a weak/common password is still guessable by hashing likely candidates and comparing — exactly what just happened, checked against ${result.triedCount} common passwords.`;
+        logSys('detectLog', `Match found: "${result.candidate}"`);
+      } else {
+        tag.className = 'verdict-tag cyan'; tag.textContent = `${result.label} — Not Cracked`;
+        text.innerHTML = `This is a <b>${result.label}</b> hash. It did not match any of ${result.triedCount} common passwords tried. That doesn't prove it's strong — only that it isn't in this small list — but it rules out the most obvious guesses.`;
+        logSys('detectLog', `No match in ${result.triedCount} candidates.`);
+      }
+      document.getElementById('detectReport').classList.add('show');
+      return;
+    }
+
+    const b64 = tryBase64(input);
+    const hex = tryHex(input);
+    const caesar = tryCaesar(input);
+
+    if(b64 && b64.printable){
+      tag.className='verdict-tag amber'; tag.textContent='Just Encoded — Base64';
+      text.innerHTML = `<b>Reversible instantly, no key required.</b> Base64 is a text-safe wrapper, not protection. Decoded:`;
+      proof.style.display='block'; proof.textContent = bytesToStr(b64.bytes);
+    } else if(hex && hex.printable){
+      tag.className='verdict-tag amber'; tag.textContent='Just Encoded — Hex';
+      text.innerHTML = `<b>Reversible instantly, no key required.</b> This is plain text in hex form. Decoded:`;
+      proof.style.display='block'; proof.textContent = bytesToStr(hex.bytes);
+    } else if(caesar){
+      tag.className='verdict-tag amber'; tag.textContent=`Just Encoded — Caesar shift ${caesar.shift}`;
+      text.innerHTML = `<b>Reversible instantly, no key required.</b> Letter-frequency analysis matched a shift-${caesar.shift} substitution — found blind, without being told the shift. Decoded:`;
+      proof.style.display='block'; proof.textContent = caesar.decoded;
+    } else if((b64 && !b64.printable) || (hex && !hex.printable)){
+      tag.className='verdict-tag cyan'; tag.textContent='Encrypted / High-Entropy Data';
+      text.innerHTML = `This is validly formatted (Base64/hex), but the decoded bytes aren't readable text — consistent with real ciphertext or binary data. No key here, so it can't be reversed.`;
+    } else {
+      const ent = shannonEntropy(input);
+      if(ent > 4.3 && input.length > 20){
+        tag.className='verdict-tag cyan'; tag.textContent='Likely Encrypted / Random';
+        text.innerHTML = `No encoding pattern matched, and entropy is ≈<b>${ent.toFixed(2)} bits/char</b> — well above typical English. Consistent with genuine ciphertext.`;
+      } else {
+        tag.className='verdict-tag green'; tag.textContent='Plain, Unprotected Text';
+        text.innerHTML = `No encoding or encryption detected. Anyone who sees this can read it as-is.`;
+      }
+    }
+    document.getElementById('detectReport').classList.add('show');
+  }, 900);
+};
+
+/* --- VAULT (Symmetric & Asymmetric) --- */
+const LOCKS = [ {id:'des', name:'DES*'}, {id:'tripledes', name:'3DES*'}, {id:'aes128', name:'AES-128'}, {id:'aes256', name:'AES-256'} ];
+let selectedLock = 'aes256';
+let currentFile = null;
+
+const grid = document.getElementById('lockGrid');
+LOCKS.forEach(l => {
+  const d = document.createElement('div');
+  d.className = 'lock-card' + (l.id === 'aes256' ? ' selected' : '');
+  d.innerHTML = `<div class="lname">${l.name}</div>`;
+  d.onclick = () => {
+    document.querySelectorAll('.lock-card').forEach(c => c.classList.remove('selected'));
+    d.classList.add('selected'); selectedLock = l.id;
+  };
+  grid.appendChild(d);
+});
+
+document.getElementById('dropzone').onclick = () => document.getElementById('fileInput').click();
+document.getElementById('fileInput').onchange = async e => {
+  const file = e.target.files[0]; if(!file) return;
+  currentFile = file;
+  document.getElementById('fileChip').textContent = `LOADED: ${file.name.toUpperCase()}`;
+  document.getElementById('fileChip').style.display = 'block';
+  
+  try {
+    const json = JSON.parse(await file.text());
+    if(json.clab) {
+      if(json.method === 'asymmetric') {
+        document.querySelector('[data-sub="public"]').click();
+        document.getElementById('asymmEncryptBlock').style.display = 'none';
+        document.getElementById('asymmDecryptBlock').style.display = 'block';
+      } else {
+        document.querySelector('[data-sub="personal"]').click();
+        document.getElementById('lockPickerSymmetric').style.display = 'none';
+        document.getElementById('decryptSymmetric').style.display = 'block';
+        document.getElementById('decryptMethodLabel').textContent = json.method.toUpperCase();
+      }
+      return;
+    }
+  } catch(e) {}
+  document.getElementById('lockPickerSymmetric').style.display = 'block';
+  document.getElementById('decryptSymmetric').style.display = 'none';
+};
+
+async function deriveKey(pw, salt, bits) {
+  const base = await crypto.subtle.importKey('raw', strToBytes(pw), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: bits }, false, ['encrypt', 'decrypt']);
+}
+
+document.getElementById('vaultEncryptBtn').onclick = async () => {
+  const pw = document.getElementById('vaultPassword').value; if(!pw || !currentFile) return;
+  await runLockAnimation(true);
+  const reader = new FileReader();
+  reader.onload = async () => {
+    if(selectedLock.includes('aes')) {
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const bits = selectedLock.includes('256') ? 256 : 128;
+      const key = await deriveKey(pw, salt, bits);
+      const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, reader.result);
+      download([JSON.stringify({clab:true, method:selectedLock, name:currentFile.name, type:currentFile.type, salt:bufToB64(salt), iv:bufToB64(iv), ct:bufToB64(ct)})], currentFile.name + ".vault");
+    } else {
+      const data = CryptoJS.lib.WordArray.create(reader.result);
+      const ct = selectedLock === 'des' ? CryptoJS.DES.encrypt(data, pw).toString() : CryptoJS.TripleDES.encrypt(data, pw).toString();
+      download([JSON.stringify({clab:true, method:selectedLock, name:currentFile.name, type:currentFile.type, ct})], currentFile.name + ".vault");
+    }
+    logSys('vaultLog', 'Symmetric encapsulation complete.');
+  };
+  reader.readAsArrayBuffer(currentFile);
+};
+
+document.getElementById('vaultDecryptBtn').onclick = async () => {
+  const pw = document.getElementById('decryptPassword').value;
+  const json = JSON.parse(await currentFile.text());
+  await runLockAnimation(false);
+  try {
+    let plain;
+    if(json.method.includes('aes')) {
+      const key = await deriveKey(pw, new Uint8Array(b64ToBuf(json.salt)), json.method.includes('256') ? 256 : 128);
+      plain = await crypto.subtle.decrypt({name:'AES-GCM', iv: new Uint8Array(b64ToBuf(json.iv))}, key, b64ToBuf(json.ct));
+    } else {
+      const dec = json.method === 'des' ? CryptoJS.DES.decrypt(json.ct, pw) : CryptoJS.TripleDES.decrypt(json.ct, pw);
+      const typed = new Uint8Array(dec.sigBytes);
+      for (let i = 0; i < dec.sigBytes; i++) typed[i] = (dec.words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
+      plain = typed.buffer;
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([plain], {type: json.type})); a.download = json.name; a.click();
+    logSys('vaultLog', 'Data restoration successful.');
+  } catch(e) { alert("Authorization Error: Incorrect Passphrase"); }
+};
+
+/* --- ASYMMETRIC LOGIC --- */
+document.getElementById('genKeyPair').onclick = async () => {
+  logSys('vaultLog', 'Deriving 2048-bit RSA-OAEP keys...');
+  const keys = await crypto.subtle.generateKey({name:"RSA-OAEP", modulusLength:2048, publicExponent:new Uint8Array([1,0,1]), hash:"SHA-256"}, true, ["encrypt","decrypt"]);
+  download([JSON.stringify(await crypto.subtle.exportKey("jwk", keys.publicKey))], "public_key.jwk");
+  download([JSON.stringify(await crypto.subtle.exportKey("jwk", keys.privateKey))], "private_key.jwk");
+  document.getElementById('keyDisplay').style.display = 'block';
+};
+
+document.getElementById('asymmEncryptBtn').onclick = async () => {
+  const jwk = document.getElementById('pubKeyInput').value; if(!currentFile || !jwk) return;
+  await runLockAnimation(true);
+  const pub = await crypto.subtle.importKey("jwk", JSON.parse(jwk), {name:"RSA-OAEP", hash:"SHA-256"}, false, ["encrypt"]);
+  const aesRaw = crypto.getRandomValues(new Uint8Array(32));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const aesKey = await crypto.subtle.importKey("raw", aesRaw, "AES-GCM", false, ["encrypt"]);
+  const ct = await crypto.subtle.encrypt({name:"AES-GCM", iv}, aesKey, await currentFile.arrayBuffer());
+  const wrappedKey = await crypto.subtle.encrypt({name:"RSA-OAEP"}, pub, aesRaw);
+  download([JSON.stringify({clab:true, method:'asymmetric', name:currentFile.name, type:currentFile.type, ek:bufToB64(wrappedKey), iv:bufToB64(iv), ct:bufToB64(ct)})], currentFile.name + ".vault");
+  logSys('vaultLog', 'Asymmetric encryption complete.');
+};
+
+document.getElementById('asymmDecryptBtn').onclick = async () => {
+  const jwk = document.getElementById('privKeyInput').value; if(!currentFile || !jwk) return;
+  await runLockAnimation(false);
+  const json = JSON.parse(await currentFile.text());
+  const priv = await crypto.subtle.importKey("jwk", JSON.parse(jwk), {name:"RSA-OAEP", hash:"SHA-256"}, false, ["decrypt"]);
+  const aesRaw = await crypto.subtle.decrypt({name:"RSA-OAEP"}, priv, b64ToBuf(json.ek));
+  const aesKey = await crypto.subtle.importKey("raw", aesRaw, "AES-GCM", false, ["decrypt"]);
+  const plain = await crypto.subtle.decrypt({name:"AES-GCM", iv: new Uint8Array(b64ToBuf(json.iv))}, aesKey, b64ToBuf(json.ct));
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([plain], {type: json.type})); a.download = json.name; a.click();
+  logSys('vaultLog', 'Private key authorization successful.');
+};
+
+/* --- ONE-TIME SHARE --- */
+const PASSPHRASE_WORDS = ["correct","harbor","planet","velvet","canyon","ember","glacier","meadow","signal","copper","willow","quartz","orbit","cascade","thistle","paper","forest","comet","ridge","lantern","hollow","summit","marble","echo","falcon","juniper","tundra","beacon","coral","drift"];
+function generatePassphrase(){
+  const pick = () => PASSPHRASE_WORDS[Math.floor(Math.random()*PASSPHRASE_WORDS.length)];
+  const num = Math.floor(Math.random()*90)+10;
+  return `${pick()}-${pick()}-${pick()}-${num}`;
+}
+document.getElementById('genPassphraseBtn').onclick = () => {
+  const field = document.getElementById('sharePassword');
+  field.type = 'text';
+  document.getElementById('sharePwToggle').textContent = 'hide';
+  field.value = generatePassphrase();
+};
+function wireShowToggle(inputId, toggleId){
+  const input = document.getElementById(inputId), toggle = document.getElementById(toggleId);
+  toggle.onclick = () => {
+    if(input.type === 'password'){ input.type='text'; toggle.textContent='hide'; }
+    else { input.type='password'; toggle.textContent='show'; }
+  };
+}
+wireShowToggle('sharePassword','sharePwToggle');
+wireShowToggle('revealPassword','revealPwToggle');
+
+function updateLengthCounter(){
+  const msg = document.getElementById('shareSecret').value;
+  const estBytes = msg.length + 16; // + GCM tag
+  const estB64 = Math.ceil(estBytes/3)*4;
+  const estTotal = estB64 + 140 + location.href.split('#')[0].length; // + json/salt/iv/url overhead
+  const el = document.getElementById('lengthCounter');
+  if(msg.length === 0){ el.textContent = ''; return; }
+  if(estTotal > 1800){
+    el.style.color = 'var(--amber)';
+    el.textContent = `~${estTotal} character link — some apps may truncate links this long. Consider shortening the message.`;
+  } else {
+    el.style.color = 'var(--steel)';
+    el.textContent = `~${estTotal} character link — safe to share anywhere.`;
+  }
+}
+document.getElementById('shareSecret').addEventListener('input', updateLengthCounter);
+
+const MAX_ATTEMPTS = 5;
+
+document.getElementById('shareGenBtn').onclick = async () => {
+  const msg = document.getElementById('shareSecret').value;
+  const pw = document.getElementById('sharePassword').value;
+  if(!msg || !pw) return;
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(pw, salt, 256);
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, strToBytes(msg));
+  const expiryMs = parseInt(document.getElementById('shareExpiry').value, 10);
+  const exp = expiryMs > 0 ? Date.now() + expiryMs : null;
+  const payload = toB64Url(btoa(JSON.stringify({s:bufToB64(salt), i:bufToB64(iv), c:bufToB64(ct), exp})));
+  const baseUrl = location.href.split('#')[0];
+  document.getElementById('shareLinkOut').textContent = baseUrl + '#share=' + payload;
+  document.getElementById('shareGenReport').classList.add('show');
+};
+
+document.getElementById('shareCopyBtn').onclick = function() {
+  const link = document.getElementById('shareLinkOut').textContent;
+  navigator.clipboard.writeText(link).then(() => {
+    this.textContent = 'COPIED!';
+    setTimeout(() => this.textContent = 'COPY LINK', 2000);
+  });
+};
+
+async function hashKeyFor(payload){
+  const digest = await crypto.subtle.digest('SHA-256', strToBytes(payload));
+  return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,16);
+}
+
+async function initShareReveal(){
+  if(!location.hash.startsWith('#share=')) return;
+
+  document.querySelector('[data-tab="share"]').click();
+  document.getElementById('shareNormal').style.display = 'none';
+  document.getElementById('shareReveal').style.display = 'block';
+
+  const payloadB64 = location.hash.split('#share=')[1];
+  let json;
+  try{ json = JSON.parse(atob(fromB64Url(payloadB64))); }
+  catch(e){
+    document.getElementById('revealError').textContent = 'This link looks incomplete or corrupted — the encrypted data could not be read.';
+    return;
+  }
+
+  const destroyKey = 'clab_destroyed_' + await hashKeyFor(payloadB64);
+  const attemptsKey = 'clab_attempts_' + await hashKeyFor(payloadB64);
+
+  if(localStorage.getItem(destroyKey) === '1'){
+    document.getElementById('revealPasswordBlock').style.display = 'none';
+    document.getElementById('alreadyViewedReport').classList.add('show');
+    return;
+  }
+
+  if(json.exp && Date.now() > json.exp){
+    localStorage.setItem(destroyKey, '1'); // expired links stay dead even if clock changes
+    document.getElementById('revealPasswordBlock').style.display = 'none';
+    document.getElementById('expiredReport').classList.add('show');
+    return;
+  }
+
+  const attemptsSoFar = parseInt(localStorage.getItem(attemptsKey) || '0', 10);
+  const attemptsLeft = MAX_ATTEMPTS - attemptsSoFar;
+  const attemptsNote = document.getElementById('attemptsNote');
+  attemptsNote.textContent = `${attemptsLeft} attempt${attemptsLeft===1?'':'s'} remaining before this link self-destructs.`;
+
+  if(attemptsLeft <= 0){
+    localStorage.setItem(destroyKey, '1');
+    document.getElementById('revealPasswordBlock').style.display = 'none';
+    document.getElementById('alreadyViewedReport').classList.add('show');
+    return;
+  }
+
+  document.getElementById('revealBtn').onclick = async () => {
+    const pw = document.getElementById('revealPassword').value;
+    const errEl = document.getElementById('revealError');
+    errEl.textContent = '';
+    try {
+      const key = await deriveKey(pw, new Uint8Array(b64ToBuf(json.s)), 256);
+      const plain = await crypto.subtle.decrypt({name:'AES-GCM', iv: new Uint8Array(b64ToBuf(json.i))}, key, b64ToBuf(json.c));
+
+      // Destroy immediately on successful open — no separate step,
+      // no window where the link could still be reused.
+      localStorage.setItem(destroyKey, '1');
+      history.replaceState(null, '', location.pathname + location.search);
+
+      document.getElementById('revealText').textContent = bytesToStr(new Uint8Array(plain));
+      document.getElementById('revealPasswordBlock').style.display = 'none';
+      document.getElementById('revealReport').classList.add('show');
+    } catch(e) {
+      const newCount = attemptsSoFar + 1;
+      localStorage.setItem(attemptsKey, String(newCount));
+      const left = MAX_ATTEMPTS - newCount;
+      if(left <= 0){
+        localStorage.setItem(destroyKey, '1');
+        document.getElementById('revealPasswordBlock').style.display = 'none';
+        document.getElementById('alreadyViewedReport').classList.add('show');
+      } else {
+        errEl.textContent = `Incorrect passphrase — try again. ${left} attempt${left===1?'':'s'} remaining before this self-destructs.`;
+        attemptsNote.textContent = `${left} attempt${left===1?'':'s'} remaining before this link self-destructs.`;
+      }
+    }
+  };
+}
+initShareReveal();
+
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden){
+    const el = document.getElementById('revealText');
+    if(el && el.textContent) el.textContent = '';
+  }
+});
+</script>
+</body>
+</html>
